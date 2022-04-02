@@ -14,40 +14,184 @@
 ## Intro
 
 * Purpose of OS:
-  * Abstract and manage hardware
-  * Multiplex: share the hardware among multiple programs at the same time
-  * Isolation
-  * Sharing
-  * Security
-  * Performance
-  * Generality
-  
-* OS organisation
-
-  * *Kernel*: a special program that provides services to running programs
-
-  * *Process*: running program
-
-  * *Shell*: command line interface, an ordinary program that reads commands from the user and executes them
-
-    ==NOTE==: shell is a user program
-
-  * *System call*: API of kernel
-
-
-![kernel_user](D:\OneDrive\NCL\Extracurricular content\MIT_6.s081\imgs\kernel_user.png)
+  * Abstract the hardware for convenience and portability
+  * Multiplex the hardware among many applications: share the hardware among multiple programs at the same time
+  * Isolate applications in order to contain bugs
+  * Allow sharing among cooperating applications
+  * Control sharing for security
+  * Don't get in the way of high performance
+  * Generality: Support a wide range of applications
 
 * Why hard/interesting?
 
-  * Unforgiving
+  * Unforgiving environment
   * Tensions
     * Efficient - Abstract
     * Powerful - Simple
     * Flexible - Secure
   * Lots of thoughts
 
+* OS organisation
+
+  * *Kernel*: a special program that provides services to running programs
+
+    * Services kernel provides:
+      * process
+      * memory allocation
+      * file contents
+      * file names, directories
+      * access control (security)
+      * many others: users, IPC, network, time, terminals
+
+  * *Process*: a running program has user-space memory containing instructions, data, and a stack and pre-process state private to the kernel
+
+    * A process alternates between executing in *user space* and *kernel space*
+    * Time-sharing processes: transparently switches the available CPUs among the set of processes waiting to execute
+
+  * *Shell*: command-line user                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   interface, an ordinary program that reads commands from the user and executes them
+
+    ==NOTE==: shell is a user program
+
+  * *System call*: API of kernel
+
+    * Look like function call but **NOT**
+
+
+![kernel_user](D:\OneDrive\NCL\Extracurricular content\MIT_6.s081\imgs\kernel_user.png)
+
+* *File descriptor*
+
+  * A small integer representing a kernel-managed object (a "file") that a process may read from or write to
+  * A process may obtain a file descriptor by
+    * opening a file, directory, or device
+    * creating a pipe
+    * duplicating an existing descriptor
+  * the FD interface abstracts away the differences between files, pipes, and devices, making them all look like streams of bytes
+  * FD indexes into a per-process table maintained by kernel
+  * Different processes have different FD spaces of fds starting at zero
+  * By convention, a process reads from FD 0 (standard input), writes output to FD 1 (standard output), and writes error messages to FD 2 (standard error)
+  * The shell exploits it to implement I/O redirection and pipelines
+  * The shell ensures that it always has three FD open, which are by default FDs for the console
+
+* *Pipes*
+
+  * **A small kernel buffer** exposed to processes as a pair of FDs, one for reading and one for writing
+  * Writing data to one end of the pipe makes that data available for reading from other end of the pipe
+  * Four advantages over temporary file:
+    * pipes automatically clean themselves up
+    * pipes can pass arbitrarily long streams of data
+    * pipes allow for parallel execution of pipeline stages
+    * efficient in IPC because of pipes' blocking reads and writes
+
 * Xv6 system calls
 
   ![system_calls](D:\OneDrive\NCL\Extracurricular content\MIT_6.s081\imgs\system_calls.png)
 
-* 
+  * `int fork()`
+
+    * create a new process called the *child process*
+
+    * child process has the **same memory contents** as the calling process called *parent process*
+
+      the parent and child are executing with **different memory and different registers**, changing a variable in one does not affect the other
+
+    * return child's PID in parent; return zero in child
+
+  * `int exit(int status)`
+
+    * cause the calling process to stop executing and to release resources such as memory and open files
+    * `status`: conventionally `0` to indicate success and `1` to indicate failure
+    * no return
+
+  * `int wait(int* status)`
+
+    * return the PID of an exited (killed) child of the current process and copies the exit status of the child to the `*status`
+    * if none of the caller's children has exited, `wait` waits for one to do so
+    * if the caller has no children, return `-1`
+    * if the parent doesn't care about the exit status of a child, it can pass a `0` address to `wait`
+
+  * `int exec(char* file, char* argv[])`
+
+    * replace the calling process's memory with a new memory image loaded from a file stored in the file system
+    * the file must have a particular format, which specifies which part of the file holds instructions, which part is data, at which instruction to start, etc.
+    * when `exec` succeed, it doesn't return to the calling program; instead, the instructions loaded from the file start executing at the entry point declared in the file header
+    * two arguments: name of the executable file, an array of string arguments
+    * conventionally, the first element is the name of the program (executable file) that most programs ignore; the last element is `0`
+    * To avoid the waste of creating a duplicate process and then immediately replacing it, os kernels optimize the implementation of `fork` for this use case by using virtual memory techniques such as copy-on-write
+
+  * Xv6 allocates most user-space memory implicitly: 
+
+    * `fork`
+    * `exec`
+    * `sbrk(n)`: a process needs more memory at run-time
+
+  * `int read(int fd, char* buf, int n)`
+
+    * read at most `n` bytes from the `fd`, copies them into `buf`, and returns the number of bytes read
+    * File has an offset. `read` reads data from the current file offset and then advances it
+    * When there are no more bytes to read, return `0` to indicate the end of the file
+
+  * `int write(int fd, char* buf, int n)`
+
+    * writes `n` bytes from `buf` to the `fd` and returns the number of bytes written
+    * Fewer than `n` bytes are written only when an error occurs.
+    * also has offset
+
+  * `int close(int fd)`
+
+    * releases a FD, making it free for reuse by a future `open`, `pipe`, or `dup`
+    * A newly allocated FD is always the lowest-numbered unused descriptor of the current process
+
+  * **I/O redirection**
+
+    * FD and `fork` interact to make I/O redirection easy to implement
+    * `exec` replaces the calling process's memory but preserves its file table
+    * although `fork` copies the FD table, each underlying file offset is shared between parent and child; this behaviour helps produce sequential output
+
+    ```c
+    // simplified version of the code a shell runs for command 
+    // cat < input.txt
+    
+    char* argv[2];
+    
+    argv[0] = "cat";
+    argv[1] = 0;
+    if(fork() == 0) {
+        close(0);
+        open("input.txt", O_RDONLY);
+        exec("cat", argv);	  // cat execute with fd 0 (standard input) 
+        					// referring to input.txt
+    }
+    ```
+
+  * `int open(char* file, int flags)`
+
+    * open a file, returns a FD
+    * flags control what `open` does
+      * `O_RDONLY`: for reading
+      * `O_WRONLY`: for writing
+      * `O_RDWR`: for both reading and writing
+      * `O_CREATE`: to create the file if it doesn't exist
+      * `O_TRUNC`: to truncate the file to zero length
+
+  * Why `fork` and `exec` instead of `forkexec`
+
+    * Between the two, the shell has a chance to redirect the child's I/O without disturbing the I/O setup of the main shell
+    * A common UNIX idiom:
+      * `fork` a child process;
+      * `exec` a command in the child
+      * parent `wait` for child to finish
+
+  * `int dup(int fd)`
+
+    * duplicates an existing FD, returns a new one that refers to the same file, sharing an offset
+
+      ==Note==: the value of new FD is not equal to the old one
+
+    * Two FDs share an offset if they were derived from the same original FD by `fork` and `dup` calls. Otherwise FDs don't share offsets even if they resulted from `open` calls for the same file.
+
+  * `int pipe(int p[])`
+
+    * creates a new pipe and records the read and write FDs in the array `p`
+    * If no data is available, a `read` on a pipe waits for either data to be written or for all FDs referring to the write end to be closed; in the latter case, `read` return `0`
+    * 
