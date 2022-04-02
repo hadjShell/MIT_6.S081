@@ -83,6 +83,23 @@
     * pipes allow for parallel execution of pipeline stages
     * efficient in IPC because of pipes' blocking reads and writes
 
+* *File system*
+
+  * File system provides 
+    * data files, which contain uninterpreted byte arrays
+    * directories, which contain named references to data files and other directories
+  * The directories form a tree, starting at a special directory called the `root`
+  * `path`: `/a/b/c` refers to the file or directory named `c` inside directory `b` inside directory `a` in the root directory `/`
+  * Paths that don't begin with `/` are evaluated relative to the calling process's current directory, which can be changed with `chdir`
+  * A file's name is distinct from the file itself: the same underlying file, called an *inode*, can have multiple names, called *links*
+  * Each inode is identified by a unique inode number
+  * Each link consists of an entry in a dir; the entry contains a file name and a reference to an inode
+  * An inode holds *metadata* about a file, including
+    * type (file or directory or device)
+    * length
+    * location of the file's content on disk
+    * number of links to a file
+
 * Xv6 system calls
 
   ![system_calls](D:\OneDrive\NCL\Extracurricular content\MIT_6.s081\imgs\system_calls.png)
@@ -192,6 +209,51 @@
 
   * `int pipe(int p[])`
 
-    * creates a new pipe and records the read and write FDs in the array `p`
+    * Creates a new pipe and records the read and write FDs in the array `p`
     * If no data is available, a `read` on a pipe waits for either data to be written or for all FDs referring to the write end to be closed; in the latter case, `read` return `0`
-    * 
+
+  * `int chdir(char* dir)`
+
+    * Change the current directory
+
+  * `int mkdir(char* dir)`
+
+    * Create a new directory
+
+  * `int mknod(char* file, int, int)`
+
+    * Create a new device file
+    * Two `int` arguments: major and minor device numbers, which uniquely identify a kernel device
+    * When a process later opens a device file, the kernel diverts `read` and `write` system calls to the kernel device implementation instead of passing them to the file system
+
+  * `int fstat(int fd, struct stat* st)`
+
+    * Place info about an open file into `*st`
+
+  * `int link(char* file1, char* file2)`
+
+    * Create another name (file 2) for the file 1
+    * Reading or writing to file 1 is the same as to file 2
+
+  * `int unlink(char* file)`
+
+    * Removes a name from the file system
+
+    * The file's inode and the disk space are only freed when the link count is zero and no FD refer to it
+
+    * An idiomatic way to create a temporary inode with no name that will be cleaned up when the process closes `fd` or exists
+
+      ```c
+      fd = open("/tmp/xyz", O_CREATE | O_RDWR);
+      unlink("/tmp/xyz");
+      ```
+
+* Real world
+  * The idea sparked a culture of "software tools" that was responsible for much of UNIX's power and popularity
+  * The shell was the first so-called "scripting language"
+  * The UNIX system call interface has been standardized through the Portable Operating System Interface (POSIX) standard
+  * Modern kernels evolve continuously and rapidly, and offer many features beyond POSIX
+  * UNIX unified access to multiple types of resources (files, directories, and devices) with a single set of file-name and file-descriptor interface
+
+***
+
