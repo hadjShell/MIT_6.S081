@@ -1,13 +1,12 @@
 # Operating System Engineering
 
-> Based on [MIT 6.S081](https://pdos.csail.mit.edu/6.828/2020/index.html)
-
 ***
 
 ## References
 
+* [MIT 6.S081](https://pdos.csail.mit.edu/6.828/2020/index.html)
 * [YouTube Unix Intro](https://www.youtube.com/watch?v=tc4ROCJYbm0)
-* a 
+* [操作系统 - 李治军](https://www.bilibili.com/video/BV1d4411v7u7?p=3)
 
 ***
 
@@ -48,7 +47,7 @@
     * A process alternates between executing in *user space* and *kernel space*
     * Time-sharing processes: transparently switches the available CPUs among the set of processes waiting to execute
 
-  * *Shell*: command-line user                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   interface, an ordinary program that reads commands from the user and executes them
+  * *Shell*: command-line user interface, an ordinary program that reads commands from the user and executes them
 
     ==NOTE==: shell is a user program
 
@@ -251,9 +250,45 @@
 * Real world
   * The idea sparked a culture of "software tools" that was responsible for much of UNIX's power and popularity
   * The shell was the first so-called "scripting language"
-  * The UNIX system call interface has been standardized through the Portable Operating System Interface (POSIX) standard
+  * The UNIX system call interface has been standardized through the Portable Operating System Interface of UNIX (POSIX) standard
   * Modern kernels evolve continuously and rapidly, and offer many features beyond POSIX
   * UNIX unified access to multiple types of resources (files, directories, and devices) with a single set of file-name and file-descriptor interface
+
+* 操作系统启动
+
+  * 两件主要工作
+    * 读入操作系统
+    * 初始化操作系统
+  * 工作链：`bootsect.s` -> `setup.s` -> `head.s` -> `main.c` 
+
+* 什么是操作系统接口
+
+  * 命令行：命令程序
+  * 图形界面：消息框架程序 + 消息处理程序
+  * 用户通过程序（应用软件）使用计算机
+  * 而这些程序：普通C代码 + 重要函数
+  * 操作系统接口：重要函数
+    * 接口表现为函数调用，又由系统提供，所以称为系统调用
+
+* 系统调用的实现
+
+  1. 不能随意调用数据，不能随意`jmp`
+     * 为了系统的安全
+
+  2. 如何不让用户程序随意`jmp`
+     * 将内核程序和用户程序隔离
+     * 区分内核态和用户态：一种处理器的“硬件设计”；0是内核态，3是用户态
+     * 和`CS:IP`有关，检查`DPL>=CPL`，内核态可以访问任何数据，用户态不能访问内核数据
+
+  3. 不`jmp`后，该怎么办
+     * 硬件提供了“主动进入内核的方法”
+     * 中断指令`int`，该指令使`CS`中的`CPL`改成0，“进入内核”
+     * 这是用户程序发起的调用内核代码的唯一方式
+     * 系统调用的核心：
+       1. 用户程序中包含一段包含`int`指令的代码（由库函数做）
+       2. 操作系统写中断处理，获取想调程序的编号
+       3. 操作系统根据编号执行相应的代码
+
 
 ***
 
